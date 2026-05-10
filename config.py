@@ -187,39 +187,212 @@ INTERVIEW_SUMMARY_TEMPLATE = """
 
 CUSTOM_CSS = """
 <style>
-    .main-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 30px;
-        border-radius: 10px;
+    /* Google Fonts */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+    /* Global Typography */
+    html, body, [class*="css"]  {
+        font-family: 'Inter', sans-serif;
+    }
+
+    /* Hide default Streamlit header */
+    header[data-testid="stHeader"] {
+        display: none;
+    }
+
+    /* Main Container Padding adjustments */
+    .block-container {
+        padding-top: 1rem !important;
+        max-width: 100% !important;
+        padding-left: 2rem !important;
+        padding-right: 2rem !important;
+    }
+
+    /* Top Navbar */
+    .top-navbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background-color: #1e202d;
+        padding: 12px 24px;
+        border-radius: 8px;
+        margin-bottom: 24px;
+        border: 1px solid #2d3042;
+    }
+    .top-navbar .logo {
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: #e2e8f0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .top-navbar .nav-right {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+    .deploy-btn {
+        background-color: #3b82f6;
         color: white;
-        margin-bottom: 20px;
+        border: none;
+        padding: 6px 16px;
+        border-radius: 6px;
+        font-weight: 500;
+        cursor: pointer;
     }
-    .info-box {
-        background-color: #f0f2f6;
-        padding: 15px;
-        border-radius: 8px;
-        margin: 10px 0;
-        border-left: 4px solid #667eea;
+    .user-profile {
+        display: flex;
+        align-items: center;
+        gap: 8px;
     }
-    .candidate-info {
-        background-color: #e8f4f8;
-        padding: 15px;
-        border-radius: 8px;
-        margin: 10px 0;
+    .user-profile img {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: #2d3042;
     }
+    .user-info {
+        display: flex;
+        flex-direction: column;
+    }
+    .user-name {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #e2e8f0;
+    }
+    .user-handle {
+        font-size: 0.75rem;
+        color: #94a3b8;
+    }
+
+    /* Session Header */
+    .session-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background-color: #1e202d;
+        padding: 16px 24px;
+        border-radius: 12px 12px 0 0;
+        border: 1px solid #2d3042;
+        border-bottom: none;
+    }
+    .session-header h3 {
+        margin: 0;
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #e2e8f0;
+    }
+    .candidate-badge {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .candidate-badge img {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+    }
+    .cand-info {
+        display: flex;
+        flex-direction: column;
+    }
+    .cand-name {
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #e2e8f0;
+    }
+    .cand-role {
+        font-size: 0.75rem;
+        color: #94a3b8;
+    }
+
+    /* Chat Container styling wrapper to attach to session header */
+    [data-testid="stVerticalBlock"] > [style*="flex-direction: column;"] {
+        background-color: #1a1b26;
+        border: 1px solid #2d3042;
+        border-radius: 0 0 12px 12px;
+        padding: 20px;
+    }
+
+    /* Sidebar Tweaks */
+    [data-testid="stSidebar"] {
+        background-color: #1e202d;
+        border-right: 1px solid #2d3042;
+    }
+    
+    /* Sidebar specific text */
+    .sidebar-phase {
+        padding: 8px 12px;
+        border-radius: 6px;
+        margin-bottom: 4px;
+        font-size: 0.9rem;
+        color: #94a3b8;
+    }
+    .sidebar-phase.active {
+        background-color: #2d3042;
+        color: #e2e8f0;
+    }
+
+    /* Chat Message Bubbles */
+    div[data-testid="stChatMessage"] {
+        background-color: #1e202d;
+        border: 1px solid #2d3042;
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 16px;
+        color: #cbd5e1;
+    }
+    
+    /* Candidate Message Bubble */
+    div[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) {
+        background-color: #2d3042;
+        border-color: #3b3f5c;
+    }
+
+    /* Input area adjustments */
+    [data-testid="stChatInput"] {
+        background-color: #1e202d !important;
+        border-radius: 24px !important;
+        border: 1px solid #3b3f5c !important;
+    }
+    
+    /* Buttons */
+    .stButton > button {
+        background-color: #2d3042;
+        color: #e2e8f0;
+        border: 1px solid #3b3f5c;
+        border-radius: 6px;
+    }
+    .stButton > button:hover {
+        border-color: #3b82f6;
+        color: #3b82f6;
+    }
+
+    /* Success message */
     .success-msg {
-        background-color: #d4edda;
-        padding: 12px;
-        border-radius: 6px;
-        border: 1px solid #c3e6cb;
-        color: #155724;
+        background-color: #0f2b1f;
+        padding: 20px;
+        border-radius: 16px;
+        border: 1px solid #166534;
+        color: #a7f3d0;
+        text-align: center;
+        margin-top: 20px;
     }
-    .warning-msg {
-        background-color: #fff3cd;
-        padding: 12px;
-        border-radius: 6px;
-        border: 1px solid #ffeeba;
-        color: #856404;
+    .success-msg h4 {
+        margin-top: 0;
+        color: #34d399;
+        font-size: 1.3rem;
+    }
+
+    /* Starlette Tab styling */
+    button[data-baseweb="tab"] {
+        color: #94a3b8 !important;
+        font-weight: 500;
+    }
+    button[data-baseweb="tab"][aria-selected="true"] {
+        color: #e2e8f0 !important;
+        border-bottom-color: #3b82f6 !important;
     }
 </style>
 """

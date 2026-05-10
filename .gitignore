@@ -49,8 +49,8 @@ wheels/
 htmlcov/
 .tox/
 
-# Streamlit
-.streamlit/
+# Streamlit — keep config.toml for deployment
+# .streamlit/
 
 # Database
 *.db

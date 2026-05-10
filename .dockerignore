@@ -1,0 +1,16 @@
+.env
+.env.*
+__pycache__/
+*.pyc
+*.pyo
+*.db
+*.sqlite
+*.sqlite3
+.git/
+.gitignore
+*.log
+.vscode/
+.idea/
+setup.bat
+test_app.py
+.dist/
