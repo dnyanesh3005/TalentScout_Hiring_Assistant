@@ -1,7 +1,7 @@
 """
-TalentScout Hiring Assistant Chatbot
-A comprehensive hiring assistant built with Streamlit and Google Gemini.
-Includes: User Auth (signup/login), CSV export, and session persistence.
+TalentScout Hiring Assistant Chatbot — v2.0
+Advanced features: Sentiment Analysis, Multilingual Support,
+Personalized Responses, Premium UI.
 """
 
 import streamlit as st
@@ -12,8 +12,12 @@ import io
 from datetime import datetime
 import config
 import google.generativeai as genai
-import hashlib
-import auth  # local auth module
+import auth
+from features import (
+    analyze_sentiment, get_sentiment_history_summary,
+    get_multilingual_system_prompt, build_personalized_context,
+    SUPPORTED_LANGUAGES,
+)
 
 # ============================================================================
 # PAGE CONFIG (MUST be first Streamlit call)
@@ -31,8 +35,6 @@ generation_config = genai.types.GenerationConfig(
     temperature=config.TEMPERATURE,
 )
 
-SYSTEM_PROMPT = config.SYSTEM_PROMPT
-TECHNICAL_QUESTION_PROMPT = config.TECHNICAL_QUESTION_PROMPT
 EXIT_KEYWORDS = config.EXIT_KEYWORDS
 
 
@@ -63,7 +65,7 @@ def convert_to_gemini_history(messages: list) -> list:
 
 
 # ============================================================================
-# HELPER FUNCTIONS
+# HELPERS
 # ============================================================================
 
 def is_exit_command(user_input: str) -> bool:
@@ -75,7 +77,7 @@ def extract_candidate_info(conversation_history: list) -> dict:
     conv_text = "\n".join([f"{msg['role']}: {msg['content']}" for msg in conversation_history])
     try:
         response_text = call_gemini(
-            system_instruction="You are a data extraction assistant. Extract candidate information from conversations and return valid JSON.",
+            system_instruction="You are a data extraction assistant. Extract candidate information and return valid JSON.",
             user_message=config.CANDIDATE_INFO_EXTRACTION_PROMPT.format(conversation_text=conv_text)
         )
         json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
@@ -113,11 +115,8 @@ def format_conversation_summary(messages: list, candidate_info: dict) -> str:
 
 
 def build_csv_export(messages: list, candidate_info: dict) -> str:
-    """Build a CSV string from the chat history and candidate info."""
     output = io.StringIO()
     writer = csv.writer(output)
-
-    # Section 1: Candidate Info
     writer.writerow(["=== CANDIDATE INFORMATION ==="])
     writer.writerow(["Field", "Value"])
     info_fields = [
@@ -133,14 +132,17 @@ def build_csv_export(messages: list, candidate_info: dict) -> str:
     ]
     for field, value in info_fields:
         writer.writerow([field, value])
-
-    # Section 2: Chat History
     writer.writerow([])
     writer.writerow(["=== CHAT HISTORY ==="])
-    writer.writerow(["#", "Role", "Message"])
+    writer.writerow(["#", "Role", "Message", "Sentiment"])
+    sentiments = st.session_state.get("sentiment_history", [])
+    user_msg_idx = 0
     for i, msg in enumerate(messages, 1):
-        writer.writerow([i, msg["role"].capitalize(), msg["content"]])
-
+        sentiment_label = ""
+        if msg["role"] == "user" and user_msg_idx < len(sentiments):
+            sentiment_label = sentiments[user_msg_idx].get("label", "")
+            user_msg_idx += 1
+        writer.writerow([i, msg["role"].capitalize(), msg["content"], sentiment_label])
     return output.getvalue()
 
 
@@ -151,61 +153,132 @@ def reset_interview():
     st.session_state.tech_questions_generated = False
     st.session_state.conversation_concluded = False
     st.session_state.show_export = False
+    st.session_state.sentiment_history = []
+
+
+def render_progress_tracker(phase: str):
+    phases = [
+        ("greeting", "👋", "Greeting"),
+        ("info_gathering", "📝", "Info Gathering"),
+        ("technical_assessment", "🧠", "Tech Assessment"),
+        ("concluded", "✅", "Concluded"),
+    ]
+    phase_order = [p[0] for p in phases]
+    current_idx = phase_order.index(phase) if phase in phase_order else 0
+
+    steps_html = ""
+    for i, (key, icon, label) in enumerate(phases):
+        if i < current_idx:
+            state = "done"
+            dot_content = "✓"
+        elif i == current_idx:
+            state = "active"
+            dot_content = icon
+        else:
+            state = "pending"
+            dot_content = str(i + 1)
+
+        step_html = f"""
+        <div class="progress-step">
+            <div class="step-dot {state}">{dot_content}</div>
+            <span class="step-label {state}">{label}</span>
+        </div>"""
+        if i < len(phases) - 1:
+            step_html += '<div class="step-connector"></div>'
+        steps_html += step_html
+
+    st.markdown(f'<div class="progress-tracker">{steps_html}</div>', unsafe_allow_html=True)
+
+
+def render_sentiment_sidebar(sentiment_history: list):
+    if not sentiment_history:
+        return
+    summary = get_sentiment_history_summary(sentiment_history)
+    dominant = summary["dominant"]
+    trend_icon = {"improving": "📈", "declining": "📉", "stable": "➡️"}.get(summary["trend"], "➡️")
+
+    st.markdown(f"""
+    <div class="sentiment-card">
+        <span class="big-emoji">{dominant['emoji']}</span>
+        <div class="sent-label">{dominant['label']}</div>
+        <div class="sent-sub">Mood trend: {trend_icon} {summary['trend'].title()}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Mini bar breakdown
+    counts = summary.get("counts", {})
+    if counts:
+        for label, count in sorted(counts.items(), key=lambda x: -x[1])[:3]:
+            pct = int(count / len(sentiment_history) * 100)
+            info = next((v for v in __import__('features').SENTIMENT_LABELS.values() if v["label"] == label), None)
+            if info:
+                st.markdown(
+                    f'<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">'
+                    f'<span style="font-size:0.8rem;width:70px;color:#94a3b8;">{info["emoji"]} {label}</span>'
+                    f'<div style="flex:1;background:#1f2236;border-radius:4px;height:6px;">'
+                    f'<div style="width:{pct}%;background:{info["color"]};border-radius:4px;height:100%;"></div>'
+                    f'</div><span style="font-size:0.7rem;color:#64748b;">{pct}%</span></div>',
+                    unsafe_allow_html=True
+                )
 
 
 # ============================================================================
-# AUTH PAGES
+# AUTH PAGES — Premium Design
 # ============================================================================
 
 def render_auth_page():
-    st.markdown("""
-    <div class="top-navbar">
-        <div class="logo">🎯 TalentScout Assistant</div>
-    </div>
-    """, unsafe_allow_html=True)
+    # Centered layout
+    _, col, _ = st.columns([1, 1.4, 1])
+    with col:
+        st.markdown("""
+        <div class="auth-card">
+            <div class="auth-hero">
+                <span class="hero-icon">🎯</span>
+                <h1>TalentScout</h1>
+                <p>AI-powered hiring assistant for modern recruiters</p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
-    st.markdown("""
-    <div style="text-align:center; margin-bottom: 30px;">
-        <h2 style="color:#e2e8f0;">Welcome to TalentScout</h2>
-        <p style="color:#94a3b8;">Sign in or create an account to start interviewing candidates</p>
-    </div>
-    """, unsafe_allow_html=True)
+        tab_login, tab_signup = st.tabs(["🔑 Sign In", "✨ Create Account"])
 
-    tab_login, tab_signup = st.tabs(["🔑 Login", "✨ Sign Up"])
-
-    with tab_login:
-        with st.form("login_form"):
-            username = st.text_input("Username", placeholder="Enter your username")
-            password = st.text_input("Password", type="password", placeholder="Enter your password")
-            submitted = st.form_submit_button("Login", use_container_width=True)
-
-        if submitted:
-            ok, msg, user = auth.login(username, password)
-            if ok:
-                st.session_state.logged_in = True
-                st.session_state.user = user
-                st.success(msg)
-                st.rerun()
-            else:
-                st.error(msg)
-
-    with tab_signup:
-        with st.form("signup_form"):
-            new_username = st.text_input("Username", placeholder="Choose a username", key="su_user")
-            new_email = st.text_input("Email", placeholder="your@email.com", key="su_email")
-            new_password = st.text_input("Password", type="password", placeholder="Min. 6 characters", key="su_pass")
-            new_password2 = st.text_input("Confirm Password", type="password", placeholder="Repeat password", key="su_pass2")
-            submitted2 = st.form_submit_button("Create Account", use_container_width=True)
-
-        if submitted2:
-            if new_password != new_password2:
-                st.error("Passwords do not match.")
-            else:
-                ok, msg = auth.signup(new_username, new_email, new_password)
+        with tab_login:
+            with st.form("login_form"):
+                username = st.text_input("Username", placeholder="Enter your username")
+                password = st.text_input("Password", type="password", placeholder="Enter your password")
+                submitted = st.form_submit_button("Sign In →", use_container_width=True)
+            if submitted:
+                ok, msg, user = auth.login(username, password)
                 if ok:
-                    st.success(msg + " Please log in.")
+                    st.session_state.logged_in = True
+                    st.session_state.user = user
+                    st.success(msg)
+                    st.rerun()
                 else:
                     st.error(msg)
+
+        with tab_signup:
+            with st.form("signup_form"):
+                new_username = st.text_input("Username", placeholder="Choose a username", key="su_user")
+                new_email    = st.text_input("Email", placeholder="your@email.com", key="su_email")
+                new_password = st.text_input("Password", type="password", placeholder="Min. 6 characters", key="su_pass")
+                new_password2= st.text_input("Confirm Password", type="password", placeholder="Repeat password", key="su_pass2")
+                submitted2   = st.form_submit_button("Create Account →", use_container_width=True)
+            if submitted2:
+                if new_password != new_password2:
+                    st.error("Passwords do not match.")
+                else:
+                    ok, msg = auth.signup(new_username, new_email, new_password)
+                    if ok:
+                        st.success(msg + " Please sign in.")
+                    else:
+                        st.error(msg)
+
+        st.markdown("""
+        <div style="text-align:center;margin-top:24px;color:#475569;font-size:0.75rem;">
+            🔒 Secure · AI-Powered · Professional Hiring
+        </div>
+        """, unsafe_allow_html=True)
 
 
 # ============================================================================
@@ -215,7 +288,6 @@ def render_auth_page():
 def render_chat_app():
     user = st.session_state.user
 
-    # --- Guard: require API key ---
     if not config.GEMINI_API_KEY:
         st.error(
             "⚠️ **GEMINI_API_KEY is missing!**\n\n"
@@ -227,39 +299,72 @@ def render_chat_app():
         st.stop()
 
     # --- Init session state ---
-    if 'messages' not in st.session_state:
-        st.session_state.messages = []
-    if 'candidate_info' not in st.session_state:
-        st.session_state.candidate_info = {}
-    if 'conversation_phase' not in st.session_state:
-        st.session_state.conversation_phase = "greeting"
-    if 'tech_questions_generated' not in st.session_state:
-        st.session_state.tech_questions_generated = False
-    if 'conversation_concluded' not in st.session_state:
-        st.session_state.conversation_concluded = False
-    if 'show_export' not in st.session_state:
-        st.session_state.show_export = False
+    defaults = {
+        "messages": [],
+        "candidate_info": {},
+        "conversation_phase": "greeting",
+        "tech_questions_generated": False,
+        "conversation_concluded": False,
+        "show_export": False,
+        "sentiment_history": [],
+        "selected_language": "English",
+    }
+    for k, v in defaults.items():
+        if k not in st.session_state:
+            st.session_state[k] = v
 
     # ---- TOP NAVBAR ----
+    past_sessions = auth.get_user_sessions(user["id"])
+    session_count = len(past_sessions)
     st.markdown(f"""
     <div class="top-navbar">
-        <div class="logo">🎯 TalentScout Assistant</div>
-        <div style="color:#94a3b8; font-size:0.9rem;">Logged in as <strong style="color:#e2e8f0;">{user['username']}</strong></div>
+        <div class="logo">
+            <span class="logo-icon">🎯</span>
+            TalentScout
+            <span class="nav-badge">AI Hiring Assistant</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;">
+            <span style="color:#64748b;font-size:0.8rem;">👤 <strong style="color:#e2e8f0;">{user['username']}</strong></span>
+            <span style="color:#64748b;font-size:0.8rem;">📂 {session_count} session{'s' if session_count != 1 else ''}</span>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
     # ---- SIDEBAR ----
     with st.sidebar:
-        st.markdown("⚙️ **Actions**")
-        col1, col2 = st.columns(2)
+        # Language selector
+        st.markdown("### 🌐 Language")
+        lang_options = list(SUPPORTED_LANGUAGES.keys())
+        lang_display = [f"{SUPPORTED_LANGUAGES[l]['flag']} {l}" for l in lang_options]
+        current_lang_idx = lang_options.index(st.session_state.selected_language)
+        selected_display = st.selectbox(
+            "Interview Language",
+            lang_display,
+            index=current_lang_idx,
+            label_visibility="collapsed",
+        )
+        new_lang = lang_options[lang_display.index(selected_display)]
+        if new_lang != st.session_state.selected_language:
+            st.session_state.selected_language = new_lang
+            st.rerun()
 
+        st.divider()
+
+        # Sentiment analysis panel
+        if config.FEATURES["sentiment_analysis"] and st.session_state.sentiment_history:
+            st.markdown("### 🧠 Sentiment Analysis")
+            render_sentiment_sidebar(st.session_state.sentiment_history)
+            st.divider()
+
+        # Actions
+        st.markdown("### ⚙️ Actions")
+        col1, col2 = st.columns(2)
         with col1:
-            if st.button("🔄 Reset Chat", use_container_width=True):
+            if st.button("🔄 Reset", use_container_width=True):
                 reset_interview()
                 st.rerun()
-
         with col2:
-            if st.button("📥 Export", use_container_width=True):
+            if st.button("📊 Export", use_container_width=True):
                 st.session_state.show_export = True
 
         if st.button("📄 View Report", use_container_width=True):
@@ -271,23 +376,42 @@ def render_chat_app():
                 del st.session_state[key]
             st.rerun()
 
+        # Stats
+        msg_count = len(st.session_state.messages)
+        user_msgs = sum(1 for m in st.session_state.messages if m["role"] == "user")
+        st.markdown(f"""
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px;">
+            <div class="stat-card">
+                <div class="stat-value">{msg_count}</div>
+                <div class="stat-label">Messages</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{user_msgs}</div>
+                <div class="stat-label">Responses</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
         # Past sessions
         st.markdown("### 📂 Past Sessions")
-        sessions = auth.get_user_sessions(user["id"])
-        if sessions:
-            for s in sessions[:5]:
-                dt = s["session_date"][:10]
+        if past_sessions:
+            for s in past_sessions[:5]:
+                dt   = s["session_date"][:10]
                 name = s["candidate_name"] or "Unnamed"
                 st.markdown(f"<div class='sidebar-phase'>📋 {name} — {dt}</div>", unsafe_allow_html=True)
         else:
             st.caption("No past sessions yet.")
 
+    # ---- PROGRESS TRACKER ----
+    render_progress_tracker(st.session_state.conversation_phase)
+
     # ---- SESSION HEADER ----
     cand_name = st.session_state.candidate_info.get("full_name", "Candidate")
     cand_role = st.session_state.candidate_info.get("desired_positions", "Tech Role")
+    lang_info = SUPPORTED_LANGUAGES[st.session_state.selected_language]
     st.markdown(f"""
     <div class="session-header">
-        <h3>Session: Technical Screening with</h3>
+        <h3>Technical Screening</h3>
         <div class="candidate-badge">
             <img src="https://api.dicebear.com/7.x/avataaars/svg?seed={cand_name}" alt="Candidate"/>
             <div class="cand-info">
@@ -295,23 +419,60 @@ def render_chat_app():
                 <span class="cand-role">{cand_role}</span>
             </div>
         </div>
+        <span style="margin-left:auto;font-size:0.8rem;color:#64748b;">
+            {lang_info['flag']} {st.session_state.selected_language}
+        </span>
     </div>
     """, unsafe_allow_html=True)
 
     # ---- CHAT MESSAGES ----
-    chat_container = st.container()
-    with chat_container:
+    with st.container():
         if not st.session_state.messages:
-            st.markdown("<div style='color:#64748b; text-align:center; padding:40px 0;'>👋 The interview will begin when the candidate sends their first message.</div>", unsafe_allow_html=True)
+            st.markdown(
+                "<div style='color:#475569;text-align:center;padding:48px 0;font-size:0.95rem;'>"
+                "👋 The interview begins when the candidate sends their first message.</div>",
+                unsafe_allow_html=True
+            )
+
+        sentiment_idx = 0
         for message in st.session_state.messages:
             with st.chat_message(message["role"]):
-                st.write(message["content"])
+                # Show sentiment badge on user messages
+                if (
+                    message["role"] == "user"
+                    and config.FEATURES["sentiment_analysis"]
+                    and sentiment_idx < len(st.session_state.sentiment_history)
+                ):
+                    sent = st.session_state.sentiment_history[sentiment_idx]
+                    badge_color = sent.get("color", "#64748b")
+                    st.markdown(
+                        f'{message["content"]}'
+                        f'<span class="sentiment-badge" style="background:{badge_color}22;color:{badge_color};border:1px solid {badge_color}44;">'
+                        f'{sent["emoji"]} {sent["label"]}</span>',
+                        unsafe_allow_html=True
+                    )
+                    sentiment_idx += 1
+                else:
+                    st.write(message["content"])
+                    if message["role"] == "user":
+                        sentiment_idx += 1
 
     # ---- INPUT AREA ----
     if not st.session_state.conversation_concluded:
-        user_input = st.chat_input("Type your response here...", key="user_input")
+        user_input = st.chat_input(
+            f"Type in {st.session_state.selected_language}...",
+            key="user_input"
+        )
 
         if user_input:
+            # Build personalised + multilingual system prompt
+            personalisation = build_personalized_context(past_sessions)
+            system_prompt = get_multilingual_system_prompt(
+                config.SYSTEM_PROMPT + personalisation,
+                st.session_state.selected_language
+            )
+
+            # Exit handling
             if is_exit_command(user_input):
                 st.session_state.messages.append({"role": "user", "content": user_input})
                 candidate_info = extract_candidate_info(st.session_state.messages)
@@ -328,25 +489,39 @@ def render_chat_app():
                 st.session_state.messages.append({"role": "assistant", "content": conclusion_response})
                 st.session_state.conversation_concluded = True
                 st.session_state.conversation_phase = "concluded"
-
-                # Auto-save session to DB
                 auth.save_session(user["id"], user["username"], st.session_state.messages, candidate_info)
                 st.rerun()
 
             st.session_state.messages.append({"role": "user", "content": user_input})
 
+            # Async sentiment analysis
+            if config.FEATURES["sentiment_analysis"]:
+                with st.spinner(""):
+                    sentiment = analyze_sentiment(user_input)
+                    st.session_state.sentiment_history.append(sentiment)
+
             try:
                 with st.spinner("🤔 Processing your response..."):
                     history = convert_to_gemini_history(st.session_state.messages[:-1])
                     assistant_message = call_gemini(
-                        system_instruction=SYSTEM_PROMPT,
+                        system_instruction=system_prompt,
                         user_message=user_input,
                         history=history if history else None
                     )
                     st.session_state.messages.append({"role": "assistant", "content": assistant_message})
 
-                    if len(st.session_state.messages) % 6 == 0:
+                    # Update conversation phase heuristic
+                    msg_count = len(st.session_state.messages)
+                    if msg_count <= 4:
+                        st.session_state.conversation_phase = "greeting"
+                    elif msg_count <= 14:
+                        st.session_state.conversation_phase = "info_gathering"
+                    else:
+                        st.session_state.conversation_phase = "technical_assessment"
+
+                    if msg_count % 6 == 0:
                         st.session_state.candidate_info = extract_candidate_info(st.session_state.messages)
+
                     st.rerun()
 
             except Exception as e:
@@ -357,11 +532,10 @@ def render_chat_app():
         st.markdown("""
         <div class="success-msg">
             <h4>✅ Interview Concluded</h4>
-            <p>Session saved to your account. Download the data below or start a new interview.</p>
+            <p>Session saved. Download the report below or start a new interview.</p>
         </div>
         """, unsafe_allow_html=True)
-
-        if st.button("🔄 Start New Interview"):
+        if st.button("🔄 Start New Interview", use_container_width=True):
             reset_interview()
             st.rerun()
 
@@ -373,48 +547,25 @@ def render_chat_app():
         candidate_info = extract_candidate_info(st.session_state.messages)
         st.session_state.candidate_info = candidate_info
         summary = format_conversation_summary(st.session_state.messages, candidate_info)
-
         fname_base = candidate_info.get('full_name', 'candidate').replace(' ', '_')
 
         col_a, col_b, col_c = st.columns(3)
-
         with col_a:
-            # CSV Export
             csv_data = build_csv_export(st.session_state.messages, candidate_info)
-            st.download_button(
-                label="📊 Download CSV",
-                data=csv_data,
-                file_name=f"{fname_base}_interview.csv",
-                mime="text/csv",
-                use_container_width=True
-            )
-
+            st.download_button("📊 Download CSV", csv_data, f"{fname_base}_interview.csv", "text/csv", use_container_width=True)
         with col_b:
-            # JSON Export
             export_data = {
                 "candidate_info": candidate_info,
                 "conversation_messages": len(st.session_state.messages),
                 "session_date": datetime.now().isoformat(),
                 "interview_type": "Initial Screening",
+                "language": st.session_state.selected_language,
+                "sentiment_history": [s.get("label") for s in st.session_state.sentiment_history],
                 "messages": st.session_state.messages
             }
-            st.download_button(
-                label="📦 Download JSON",
-                data=json.dumps(export_data, indent=2),
-                file_name=f"{fname_base}_interview.json",
-                mime="application/json",
-                use_container_width=True
-            )
-
+            st.download_button("📦 Download JSON", json.dumps(export_data, indent=2), f"{fname_base}_interview.json", "application/json", use_container_width=True)
         with col_c:
-            # Markdown Export
-            st.download_button(
-                label="📄 Download Report",
-                data=summary,
-                file_name=f"{fname_base}_summary.md",
-                mime="text/markdown",
-                use_container_width=True
-            )
+            st.download_button("📄 Download Report", summary, f"{fname_base}_summary.md", "text/markdown", use_container_width=True)
 
         st.markdown(summary)
 
@@ -424,7 +575,6 @@ def render_chat_app():
 # ============================================================================
 
 def main():
-    # Initialise auth state
     if "logged_in" not in st.session_state:
         st.session_state.logged_in = False
     if "user" not in st.session_state:
