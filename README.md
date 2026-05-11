@@ -1,58 +1,81 @@
-# 🎯 TalentScout — Intelligent Hiring Assistant Chatbot
+# 🎯 TalentScout — AI-Powered Hiring Assistant
 
-> An AI-powered candidate screening chatbot built with **Streamlit** and **Google Gemini**, featuring user authentication, session persistence, and multi-format data export.
+> A conversational AI screening assistant built with **Streamlit** and **Google Gemini**, featuring real-time sentiment analysis, multilingual support, personalized responses, and a premium dark UI.
+
+[![Python](https://img.shields.io/badge/Python-3.9+-blue?logo=python)](https://python.org)
+[![Streamlit](https://img.shields.io/badge/Streamlit-1.32+-red?logo=streamlit)](https://streamlit.io)
+[![Gemini](https://img.shields.io/badge/Google%20Gemini-2.5%20Flash-orange?logo=google)](https://aistudio.google.com)
+[![License](https://img.shields.io/badge/License-Educational-green)](./LICENSE)
 
 ---
 
 ## 📋 Project Overview
 
-**TalentScout** is an intelligent hiring assistant chatbot designed for technology recruitment agencies to conduct initial candidate screening. The application uses Google Gemini's large language model to gather candidate information, assess technical expertise, generate relevant technical questions, and persist interview sessions for future reference.
+**TalentScout** is an intelligent hiring assistant that conducts initial tech candidate screenings through a natural, human-like conversation. Powered by Google Gemini, it collects candidate information, assesses technical skills, analyzes emotional tone in real time, and supports interviews in 9 languages — all behind a premium glassmorphism dark UI.
 
-### ✨ Key Features
-
-| Feature | Description |
-|---|---|
-| 🔐 User Authentication | Secure signup & login with bcrypt password hashing (SQLite backend) |
-| 💬 Conversational Interview | Natural, multi-phase interview flow powered by Google Gemini |
-| 📝 Auto Info Gathering | Collects name, email, phone, experience, location, desired position & tech stack |
-| 🧠 Technical Assessment | Generates 3–5 tailored technical questions based on the candidate's tech stack |
-| 📂 Session Persistence | Saves completed interview sessions to a local SQLite database per user |
-| 📤 Multi-Format Export | Download interview data as **CSV**, **JSON**, or **Markdown** report |
-| 🎨 Premium Dark UI | Custom Streamlit dark theme with Inter typography and glassmorphism-inspired styling |
-| 🐳 Docker Ready | Full Dockerfile included for containerized deployment |
+The AI persona is **"Alex"** — a warm, experienced technical recruiter who asks questions **strictly one at a time**, holds position if a candidate skips a question, and never feels like a form.
 
 ---
 
-## 🏗️ Architecture & Design
+## ✨ Features
 
-### System Components
+### Core
+| Feature | Description |
+|---|---|
+| 🔐 User Authentication | Secure signup & login with bcrypt password hashing (SQLite) |
+| 💬 Conversational Screening | Natural multi-phase interview flow — not a form, a real conversation |
+| 🎯 One-Question-at-a-Time | Strict sequential questioning — bot re-asks if candidate skips or gives vague answer |
+| 📝 Smart Info Gathering | Collects name, email, phone, experience, location, role preference & tech stack |
+| 🧠 Technical Assessment | 3–5 tailored questions: foundational → practical → senior trade-offs |
+| 📂 Session Persistence | Saves completed interviews to SQLite per recruiter account |
+| 📤 Multi-Format Export | Download as **CSV**, **JSON**, or **Markdown** report |
+
+### Advanced
+| Feature | Description |
+|---|---|
+| 😊 Sentiment Analysis | Detects 7 candidate emotions per message (Confident, Nervous, Excited, Confused, Enthusiastic, Frustrated, Neutral) |
+| 🌐 Multilingual Support | Conduct interviews in 9 languages: English, Hindi, Spanish, French, German, Arabic, Chinese, Japanese, Portuguese |
+| 🎯 Personalized Responses | AI greets returning recruiters with context from past sessions |
+| 📊 Live Sentiment Dashboard | Sidebar shows dominant mood, trend (improving/declining/stable) and emotion breakdown |
+
+### UI
+| Feature | Description |
+|---|---|
+| 🎨 Glassmorphism Dark Theme | Full CSS design token system, animated gradient navbar, premium card layouts |
+| 📈 Progress Tracker | Visual step bar: Greeting → Info → Technical → Concluded |
+| ⚡ Micro-Animations | Fade-in messages, hover lifts, focus glow on chat input |
+| 📊 Live Stats Cards | Message count and candidate response count in the sidebar |
+| 🖼️ Candidate Avatar | Auto-generated DiceBear avatar per candidate name |
+
+---
+
+## 🏗️ Architecture
 
 ```
-┌───────────────────────────────────────────────────────┐
-│              Streamlit Frontend (hiring_assistant.py) │
-│  - Auth gate (login / signup)                         │
-│  - Top navbar, sidebar, chat UI, export panel         │
-├───────────────────────────────────────────────────────┤
-│               Application Logic                       │
-│  - Exit command detection                             │
-│  - Candidate info extraction (via Gemini)             │
-│  - Conversation state management                      │
-│  - CSV / JSON / Markdown export builders              │
-├───────────────────────────────────────────────────────┤
-│                   auth.py                             │
-│  - SQLite DB init (users + sessions tables)           │
-│  - signup() / login() with bcrypt hashing             │
-│  - save_session() / get_user_sessions()               │
-├───────────────────────────────────────────────────────┤
-│                   config.py                           │
-│  - All prompts, CSS, page config, feature flags       │
-│  - Reads .env via python-dotenv                       │
-├───────────────────────────────────────────────────────┤
-│            Google Gemini API (generativeai)           │
-│  - gemini-2.5-flash (default, free tier)              │
-│  - Multi-turn chat history support                    │
-│  - JSON-structured extraction responses               │
-└───────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│            hiring_assistant.py  (Streamlit Frontend)        │
+│  Auth gate · Navbar · Progress tracker · Chat UI            │
+│  Sentiment badges · Language selector · Export panel        │
+├─────────────────────────────────────────────────────────────┤
+│                      features.py                            │
+│  analyze_sentiment()  — per-message emotion via Gemini      │
+│  get_multilingual_system_prompt()  — language injection     │
+│  build_personalized_context()  — past session greeting      │
+│  SUPPORTED_LANGUAGES  — 9-language registry                 │
+├─────────────────────────────────────────────────────────────┤
+│                       auth.py                               │
+│  SQLite DB init · signup() · login() · save_session()       │
+│  get_user_sessions() · bcrypt hashing                       │
+├─────────────────────────────────────────────────────────────┤
+│                      config.py                              │
+│  SYSTEM_PROMPT (Alex persona + hold-position rules)         │
+│  TECHNICAL_QUESTION_PROMPT · CANDIDATE_INFO_EXTRACTION_PROMPT│
+│  CONCLUSION_TEMPLATE · CUSTOM_CSS · PAGE_CONFIG · FEATURES  │
+├─────────────────────────────────────────────────────────────┤
+│                  Google Gemini API                          │
+│  gemini-2.5-flash (default, free tier)                      │
+│  Multi-turn chat · JSON extraction · Sentiment classification│
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ### Conversation Flow
@@ -61,37 +84,44 @@
 START
   │
   ├─→ AUTH GATE
-  │    ├─→ Login (username + password)
+  │    ├─→ Login  (username + password)
   │    └─→ Sign Up (username, email, password)
   │
   └─→ CHAT APP
        │
-       ├─→ 👋 GREETING PHASE
-       │    └─→ Chatbot greets candidate, explains purpose
+       ├─→ 👋 GREETING  — Alex introduces himself, asks for name only
        │
-       ├─→ 📝 INFORMATION GATHERING PHASE
-       │    ├─→ Full name, email, phone
-       │    ├─→ Years of experience, desired position(s)
-       │    ├─→ Current location
-       │    └─→ Tech stack (languages, frameworks, tools)
+       ├─→ 📝 INFO GATHERING  — one field per turn (strictly)
+       │    Email → Phone → Location → Experience → Role → Tech Stack
+       │    (Bot re-asks if skipped or vague — never moves forward)
        │
-       ├─→ 🧠 TECHNICAL ASSESSMENT PHASE
-       │    ├─→ 3–5 questions generated from tech stack
-       │    ├─→ Progressive difficulty (beginner → advanced)
-       │    └─→ Context-aware follow-up questions
+       ├─→ 🧠 TECHNICAL ASSESSMENT  — one question per turn
+       │    Foundational → Practical → Senior trade-offs
+       │    (Bot re-asks with hints if "I don't know" or dodge)
        │
-       └─→ ✅ CONCLUSION PHASE
-            ├─→ Candidate summary displayed
-            ├─→ Session auto-saved to SQLite DB
-            ├─→ Next-steps information shown
-            └─→ Export options (CSV / JSON / Markdown)
+       └─→ ✅ CONCLUSION
+            ├─→ Warm recap shown
+            ├─→ Session auto-saved to SQLite
+            ├─→ Sentiment summary displayed
+            └─→ Export: CSV / JSON / Markdown
 ```
 
-### Exit Keywords
+### Sentiment Analysis Flow
 
-Type any of the following to gracefully conclude an interview:
-
-`exit` · `quit` · `bye` · `goodbye` · `done` · `finish` · `see you` · `thanks bye` · `thank you bye`
+```
+Candidate types message
+       │
+       ▼
+analyze_sentiment(message)   ←── Gemini mini-call (10 tokens max)
+       │
+       ▼
+Returns: { emoji, color, label }
+       │
+       ├─→ Badge shown inline on message bubble
+       └─→ Appended to sentiment_history[]
+                │
+                └─→ Sidebar: dominant mood + trend + bar chart
+```
 
 ---
 
@@ -104,25 +134,7 @@ Type any of the following to gracefully conclude an interview:
 | Gemini SDK | google-generativeai | ≥ 0.8.3 |
 | Auth & DB | SQLite + bcrypt | Built-in / ≥ 3.2.0 |
 | Env Management | python-dotenv | ≥ 1.0.0 |
-| Gradio (optional) | gradio | ≥ 5.0.0 |
 | Language | Python | 3.9+ |
-
-### Key Libraries
-
-- **streamlit** — Web UI framework for the chat interface
-- **google-generativeai** — Official Google Gemini API SDK
-- **python-dotenv** — Loads `GEMINI_API_KEY` and other config from `.env`
-- **bcrypt** — Secure password hashing for user auth
-- **sqlite3** — Built-in Python module for local database (users + sessions)
-- **json / csv / io** — Multi-format data export
-- **re** — Regex-based JSON extraction from model responses
-
-### Why Google Gemini?
-
-- **Free tier available** — no credit card required for `gemini-2.5-flash`
-- **Multi-turn chat API** — native history support via `start_chat()`
-- **Strong instruction following** — reliable JSON output for data extraction
-- **Configurable** — swap model via `MODEL` env var without code changes
 
 ---
 
@@ -132,13 +144,12 @@ Type any of the following to gracefully conclude an interview:
 
 - Python **3.9+**
 - A **free** Google Gemini API key → [Get it here](https://aistudio.google.com/app/apikey)
-- Git
 
 ### Step 1 — Clone the Repository
 
 ```bash
-git clone <repository-url>
-cd AthereAi
+git clone https://github.com/dnyanesh3005/TalentScout_Hiring_Assistant.git
+cd TalentScout_Hiring_Assistant
 ```
 
 ### Step 2 — Create a Virtual Environment
@@ -161,29 +172,32 @@ pip install -r requirements.txt
 
 ### Step 4 — Configure Environment Variables
 
-Create a `.env` file in the project root (or copy and edit the example below):
+Copy the example file and add your API key:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env`:
 
 ```env
 # Required — get your free key from https://aistudio.google.com/app/apikey
 GEMINI_API_KEY=your_gemini_api_key_here
 
-# Optional — Model selection (free models)
-# Options: gemini-2.5-flash | gemini-2.0-flash | gemini-2.5-pro
+# Optional
 MODEL=gemini-2.5-flash
-
-# Optional — Application Settings
 DEBUG=false
 MAX_TOKENS=1000
 TEMPERATURE=0.7
 ```
 
-### Step 5 — Run the Application
+### Step 5 — Run the App
 
 ```bash
 streamlit run hiring_assistant.py
 ```
 
-The app will open at **`http://localhost:8501`**
+Open **`http://localhost:8501`** in your browser.
 
 ---
 
@@ -191,82 +205,82 @@ The app will open at **`http://localhost:8501`**
 
 ### First-Time Setup
 
-1. Open the app — you'll see the **TalentScout** auth screen.
-2. Go to the **Sign Up** tab → create your recruiter account.
-3. Switch to **Login** → enter your credentials.
-4. You're now in the interview dashboard.
+1. Open the app → you'll see the **TalentScout** auth screen.
+2. Go to **Create Account** tab → register your recruiter account.
+3. Switch to **Sign In** → log in.
+4. You're now inside the interview dashboard.
 
 ### Running an Interview
 
-1. The chat area will prompt the candidate to send the first message.
-2. The AI assistant guides the conversation through all four phases automatically.
-3. Candidate information is extracted periodically in the background.
-4. When the candidate types an **exit keyword**, the session concludes and is saved.
+1. Select the **interview language** from the sidebar (default: English).
+2. The candidate sends the first message — Alex greets them and starts the flow.
+3. The **progress tracker** at the top shows the current phase.
+4. **Sentiment badges** appear in real time on each candidate message.
+5. When the candidate types an exit keyword, the session concludes and is auto-saved.
+
+### Exit Keywords
+
+Type any of these to gracefully end the interview:
+
+`exit` · `quit` · `bye` · `goodbye` · `done` · `finish` · `see you` · `thanks bye` · `thank you bye`
 
 ### Sidebar Actions
 
-| Button | Action |
+| Control | Action |
 |---|---|
-| 🔄 Reset Chat | Clear current interview and start fresh |
-| 📥 Export | Open the export panel (CSV / JSON / Report) |
-| 📄 View Report | Show and download the interview summary |
-| 🚪 Logout | Clear session and return to the auth screen |
-| 📂 Past Sessions | Shows the last 5 saved interviews for the logged-in user |
+| 🌐 Language | Switch interview language (9 options) |
+| 🧠 Sentiment Panel | Live mood tracker with trend and breakdown |
+| 🔄 Reset | Clear current interview and start fresh |
+| 📊 Export | Open export panel (CSV / JSON / Report) |
+| 🚪 Logout | Return to the auth screen |
+| 📂 Past Sessions | Last 5 saved interviews for this recruiter |
+| 📊 Stats | Message count and candidate response count |
 
 ### Exporting Interview Data
 
-After an interview concludes (or via the Export button):
-
-- **📊 CSV** — Candidate info + full chat history in spreadsheet format
-- **📦 JSON** — Structured JSON with all messages and metadata
-- **📄 Markdown Report** — Formatted summary suitable for documentation
+- **📊 CSV** — Candidate info + full chat history + sentiment labels per message
+- **📦 JSON** — Structured JSON with messages, metadata, language used, and sentiment history
+- **📄 Markdown** — Formatted summary report for documentation
 
 ---
 
 ## 🧠 Prompt Engineering
 
-### System Prompt Design
+### The "Alex" Persona
 
-The `SYSTEM_PROMPT` in `config.py` structures the entire interview:
+The AI plays **Alex**, a warm and experienced technical recruiter. Key design principles:
 
-```
-Role Definition → Conversation Phases → Behavioral Guidelines → Exit Handling
-```
+- **One question per message, always** — strictly enforced via the system prompt
+- **Hold-position logic** — if a candidate skips or gives a vague answer, Alex re-asks the same question with a hint instead of moving forward
+- **Validity thresholds** — the prompt defines what counts as a valid answer per field (e.g. email must have "@", phone must have 7+ digits)
+- **Adaptive tone** — more casual with juniors, peer-level with seniors
+- **No robotic checklists** — info is gathered through natural conversation
 
-Key design decisions:
-- **One or two questions at a time** — avoids overwhelming the candidate
-- **Contextual follow-ups** — uses full message history passed as `history=`
-- **Fallback handling** — redirects off-topic inputs back to the interview
-- **Professional yet friendly tone** — makes candidates comfortable
+### Hold-Position Examples (built into the prompt)
+
+| Candidate Response | Alex's Action |
+|---|---|
+| Skips email question | Re-asks: *"I just need an email so we can follow up — like name@gmail.com?"* |
+| "I work with computers" for tech stack | Probes: *"Could you be more specific? Python, JS, Java? Any frameworks?"* |
+| "I don't know" to a technical question | Encourages: *"No pressure — just give me your best guess or how you'd think about it!"* |
+| Goes off-topic | Acknowledges briefly, then re-asks the exact same question |
 
 ### Candidate Info Extraction
 
-A dedicated `CANDIDATE_INFO_EXTRACTION_PROMPT` is sent to Gemini every 6 messages. It returns a JSON object with:
+Runs every 6 messages via a dedicated Gemini call. Returns:
 
 ```json
 {
-  "full_name": "Jane Doe",
-  "email": "jane@example.com",
-  "phone": "+1234567890",
-  "years_of_experience": "5",
-  "desired_positions": "Backend Engineer",
+  "full_name": "Priya Sharma",
+  "email": "priya@example.com",
+  "phone": "+91 9876543210",
+  "years_of_experience": 4,
+  "desired_positions": "Full Stack Developer",
   "current_location": "Pune, India",
-  "tech_stack": ["Python", "Django", "PostgreSQL", "Docker"]
-}
-```
-
-### Technical Question Generation
-
-The `TECHNICAL_QUESTION_PROMPT` takes the extracted `tech_stack` and returns:
-
-```json
-{
-  "questions": [
-    {"id": 1, "question": "...", "difficulty": "beginner"},
-    {"id": 2, "question": "...", "difficulty": "intermediate"},
-    {"id": 3, "question": "...", "difficulty": "advanced"}
-  ],
-  "intro": "Let's assess your Python and Django expertise..."
+  "remote_preference": "open to both",
+  "tech_stack": ["Python", "React", "PostgreSQL", "Docker"],
+  "technical_responses": ["Explained REST vs GraphQL trade-offs", "Described Docker networking"],
+  "overall_impression": "Strong backend knowledge, solid communication"
 }
 ```
 
@@ -275,21 +289,66 @@ The `TECHNICAL_QUESTION_PROMPT` takes the extracted `tech_stack` and returns:
 ## 📁 Project Structure
 
 ```
-AthereAi/
-├── hiring_assistant.py   # Main Streamlit app (auth gate + chat UI)
-├── auth.py               # SQLite user auth (signup, login, sessions)
-├── config.py             # All constants: prompts, CSS, page config
-├── utils.py              # Utility helpers
-├── gradio_app.py         # Alternative Gradio interface (optional)
-├── requirements.txt      # Python dependencies
-├── Dockerfile            # Docker containerization
-├── setup.bat             # Windows quick-setup script
-├── talentscout.db        # SQLite database (auto-created on first run)
-├── .env                  # API key and config (not committed to git)
+TalentScout_Hiring_Assistant/
+├── hiring_assistant.py    # Main Streamlit app — auth gate, chat UI, all features
+├── features.py            # Sentiment analysis, multilingual support, personalization
+├── auth.py                # SQLite user auth (signup, login, session management)
+├── config.py              # Prompts, CSS design system, page config, feature flags
+├── utils.py               # Validation and utility helpers
+├── gradio_app.py          # Alternative Gradio interface (optional)
+├── requirements.txt       # Python dependencies
+├── Dockerfile             # Docker containerization
+├── setup.bat              # Windows quick-setup script
+├── test_app.py            # Test suite
+├── .env                   # API keys — NOT committed to git
+├── .env.example           # Template for new developers
+├── .gitignore             # Excludes .env, __pycache__, *.db, etc.
 ├── .streamlit/
-│   └── config.toml       # Streamlit theme configuration
-└── test_app.py           # Test suite
+│   └── config.toml        # Streamlit theme configuration
+└── talentscout.db         # SQLite database (auto-created on first run)
 ```
+
+---
+
+## 🌐 Multilingual Support
+
+TalentScout supports interviews in **9 languages**:
+
+| Language | Flag | Native Name |
+|---|---|---|
+| English | 🇺🇸 | English |
+| Hindi | 🇮🇳 | हिन्दी |
+| Spanish | 🇪🇸 | Español |
+| French | 🇫🇷 | Français |
+| German | 🇩🇪 | Deutsch |
+| Arabic | 🇸🇦 | العربية |
+| Chinese | 🇨🇳 | 中文 |
+| Japanese | 🇯🇵 | 日本語 |
+| Portuguese | 🇧🇷 | Português |
+
+The selected language is appended to the system prompt, so the entire conversation — including Alex's questions and the conclusion message — is in the chosen language.
+
+---
+
+## 😊 Sentiment Analysis
+
+Each candidate message is analyzed by a fast Gemini micro-call (10 tokens) and classified into one of 7 emotional states:
+
+| Emotion | Emoji | Color |
+|---|---|---|
+| Confident | 😊 | Green |
+| Nervous | 😰 | Amber |
+| Excited | 🤩 | Purple |
+| Confused | 😕 | Red |
+| Neutral | 😐 | Slate |
+| Frustrated | 😤 | Orange |
+| Enthusiastic | 🚀 | Cyan |
+
+**Outputs:**
+- Inline badge on each user message bubble
+- Sidebar sentiment card (dominant mood + trend)
+- Visual emotion breakdown bar chart
+- Sentiment labels included in CSV/JSON exports
 
 ---
 
@@ -297,14 +356,13 @@ AthereAi/
 
 ### Auth Flow
 
-1. **Signup** — username + email + password → `bcrypt.hashpw()` → stored in `users` table
-2. **Login** — username + password → `bcrypt.checkpw()` against stored hash
+1. **Signup** — `bcrypt.hashpw()` → stored in `users` table
+2. **Login** — `bcrypt.checkpw()` against stored hash
 3. **Session** — stored in Streamlit `session_state` (in-memory per browser tab)
 
-### Database Schema (SQLite — `talentscout.db`)
+### Database Schema
 
 ```sql
--- Users table
 CREATE TABLE users (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     username      TEXT UNIQUE NOT NULL,
@@ -313,7 +371,6 @@ CREATE TABLE users (
     created_at    TEXT NOT NULL
 );
 
--- Sessions table
 CREATE TABLE sessions (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id        INTEGER NOT NULL,
@@ -323,7 +380,7 @@ CREATE TABLE sessions (
     candidate_name TEXT,
     candidate_role TEXT,
     tech_stack     TEXT,
-    chat_export    TEXT,   -- Full JSON of all messages
+    chat_export    TEXT,
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 ```
@@ -332,25 +389,21 @@ CREATE TABLE sessions (
 
 ## 🐳 Docker Deployment
 
-### Build & Run with Docker
-
 ```bash
-# Build the image
+# Build
 docker build -t talentscout .
 
-# Run the container (pass your Gemini API key)
+# Run
 docker run -p 8501:8501 -e GEMINI_API_KEY=your_key_here talentscout
 ```
 
-Access the app at **`http://localhost:8501`**
-
 ### Streamlit Cloud Deployment
 
-1. Push this repository to GitHub
+1. Push this repo to GitHub
 2. Go to [share.streamlit.io](https://share.streamlit.io)
-3. Connect your repo and set `hiring_assistant.py` as the entry point
-4. Add `GEMINI_API_KEY` under **Secrets** in the app settings
-5. Deploy — the app auto-deploys on every push
+3. Connect your repo → set `hiring_assistant.py` as the entry point
+4. Add `GEMINI_API_KEY` under **Secrets**
+5. Deploy ✅
 
 ---
 
@@ -358,66 +411,55 @@ Access the app at **`http://localhost:8501`**
 
 | Challenge | Solution |
 |---|---|
-| Structured data from free-form chat | Dedicated extraction prompt → Gemini JSON output → regex `{...}` parse |
-| Context across many messages | Full `history=` list passed to `model.start_chat()` on every call |
-| Off-topic / irrelevant input | System prompt fallback instructs AI to redirect politely |
-| Free API rate limits | Extraction runs every 6 messages, not on every turn |
-| Password security | `bcrypt` with per-password salts — never stores plaintext |
-| Session data persistence | SQLite `sessions` table saves full chat JSON on conclusion |
-
----
-
-## 📈 Future Enhancements (Phase 2)
-
-Planned features (already flagged in `config.py` under `FEATURES`):
-
-- [ ] **Sentiment Analysis** — gauge candidate confidence in real time
-- [ ] **Multilingual Support** — interviews in multiple languages
-- [ ] **Resume Parsing** — upload PDF and auto-fill candidate info
-- [ ] **Candidate Scoring** — automatic ranking and recommendation
-- [ ] **ATS Integration** — webhook push to external applicant tracking systems
-- [ ] **Analytics Dashboard** — interview stats, conversion rates, time-to-hire
+| Bot moving forward on skipped questions | System prompt hold-position logic with validity thresholds per field |
+| Robotic interview feel | "Alex" persona with adaptive tone, reactions, and natural follow-ups |
+| Sentiment without a dedicated API | Gemini micro-call (10 tokens max) — fast and free |
+| Language switching mid-session | Language instruction appended to system prompt on every API call |
+| Structured data from free-form chat | Dedicated extraction prompt → Gemini JSON → regex `{...}` parse |
+| Free API rate limits | Sentiment runs per message; extraction runs every 6 messages |
+| Password security | bcrypt with per-password salts — never stores plaintext |
 
 ---
 
 ## 🐛 Troubleshooting
 
 ### `GEMINI_API_KEY` not found
-Ensure `.env` exists in the project root and contains:
+```bash
+# Make sure .env exists with your key
+echo "GEMINI_API_KEY=your_key_here" > .env
 ```
-GEMINI_API_KEY=your_key_here
-```
-Then restart the app.
 
-### `ModuleNotFoundError` for any package
+### Port 8501 already in use
+```bash
+# Windows
+taskkill /f /im streamlit.exe
+
+# Then restart
+streamlit run hiring_assistant.py
+```
+
+### `ModuleNotFoundError`
 ```bash
 pip install -r requirements.txt
 ```
 
 ### Quota / rate limit error from Gemini
-- The free tier has per-minute request limits.
-- Wait 60 seconds and retry.
-- Alternatively, switch to `gemini-2.0-flash` which has higher free-tier limits.
+- Wait 60 seconds and retry
+- Switch to `gemini-2.0-flash` in `.env` for higher free-tier limits
 
 ### Session data not saving
-- `talentscout.db` is created automatically on first run in the project directory.
-- Ensure the app has write permission to the project folder.
-
-### App crashes on login
-- Run `python auth.py` once to verify the database initialises correctly.
-- Delete `talentscout.db` and restart to reset all users.
+- `talentscout.db` is auto-created in the project folder on first run
+- Ensure the app has write permission to the directory
 
 ---
 
-## 📝 Code Quality
+## 📈 Roadmap (Phase 3)
 
-- ✅ Modular separation: `hiring_assistant.py` / `auth.py` / `config.py`
-- ✅ All prompts centralised in `config.py` — no hard-coded strings in logic
-- ✅ bcrypt password hashing with salt
-- ✅ SQLite parameterised queries (no SQL injection)
-- ✅ Graceful error handling with user-friendly Streamlit messages
-- ✅ Session state properly initialised before use
-- ✅ CSV / JSON export with structured field mapping
+- [ ] **Resume Parsing** — upload PDF/DOCX and auto-fill candidate info
+- [ ] **Candidate Scoring** — automatic ranking and recommendation engine
+- [ ] **ATS Integration** — webhook push to Greenhouse, Lever, or Workday
+- [ ] **Analytics Dashboard** — interview stats, conversion rates, avg sentiment per role
+- [ ] **Voice Mode** — audio input/output for hands-free interviews
 
 ---
 
@@ -425,24 +467,16 @@ pip install -r requirements.txt
 
 - [Streamlit Documentation](https://docs.streamlit.io/)
 - [Google Gemini API Docs](https://ai.google.dev/gemini-api/docs)
-- [Google AI Studio (free API key)](https://aistudio.google.com/app/apikey)
-- [Prompt Engineering Guide](https://www.promptingguide.ai/)
+- [Google AI Studio — Free API Key](https://aistudio.google.com/app/apikey)
 - [bcrypt Python Docs](https://pypi.org/project/bcrypt/)
-- [SQLite Python Docs](https://docs.python.org/3/library/sqlite3.html)
-
----
-
-## 📄 License
-
-This project is provided for educational and evaluation purposes.
 
 ---
 
 ## 👤 Author
 
 **Dnyaneshwar Kale**  
-Developed as part of a TalentScout AI Hiring Assistant project.
+[GitHub](https://github.com/dnyanesh3005) · TalentScout AI Hiring Assistant
 
 ---
 
-**Last Updated**: May 2026 · **Version**: 2.0.0 · **Status**: ✅ Production Ready
+**Version**: 2.0.0 · **Last Updated**: May 2026 · **Status**: ✅ Production Ready
